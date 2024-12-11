@@ -35,8 +35,8 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
-
+        out = minitorch.conv1d(input, self.weights.value)
+        return out + self.bias.value
 
 class CNNSentimentKim(minitorch.Module):
     """
@@ -62,14 +62,43 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Create parallel convolution layers for different filter sizes
+        self.convs = []
+        for filter_size in filter_sizes:
+            self.convs.append(Conv1d(embedding_size, feature_map_size, filter_size))
+
+        # Linear layer for final classification
+        # Input size is feature_map_size * number of filter sizes
+        self.linear = Linear(feature_map_size * len(filter_sizes), 1)
+
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Transpose to [batch x embedding dim x sentence length] for Conv1d
+        x = embeddings.permute(0, 2, 1)
+
+        # Apply convolutions and collect results
+        conv_results = []
+        for conv in self.convs:
+            # Apply convolution and ReLU
+            activated = minitorch.relu(conv.forward(x))
+            # Max-over-time pooling
+            pooled = minitorch.max(activated, 2)
+            conv_results.append(pooled)
+
+        # Concatenate all conv results
+        combined = minitorch.cat(conv_results, 1)
+
+        # Apply dropout (during training)
+        if self.training:
+            combined = minitorch.dropout(combined, self.dropout)
+
+        # Final linear layer and sigmoid
+        logits = self.linear.forward(combined)
+        return minitorch.sigmoid(logits.view(logits.shape[0]))
 
 
 # Evaluation helper methods

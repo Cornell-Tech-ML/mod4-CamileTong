@@ -3,6 +3,7 @@ from hypothesis import given
 
 import minitorch
 from minitorch import Tensor
+from minitorch import nn
 
 from .strategies import assert_close
 from .tensor_strategies import tensors
@@ -11,46 +12,62 @@ from .tensor_strategies import tensors
 @pytest.mark.task4_3
 @given(tensors(shape=(1, 1, 4, 4)))
 def test_avg(t: Tensor) -> None:
-    out = minitorch.avgpool2d(t, (2, 2))
+    out = minitorch.avgpool2d(t, (2, 2))  # type: ignore
     assert_close(
         out[0, 0, 0, 0], sum([t[0, 0, i, j] for i in range(2) for j in range(2)]) / 4.0
     )
 
-    out = minitorch.avgpool2d(t, (2, 1))
+    out = minitorch.avgpool2d(t, (2, 1))  # type: ignore
     assert_close(
         out[0, 0, 0, 0], sum([t[0, 0, i, j] for i in range(2) for j in range(1)]) / 2.0
     )
 
-    out = minitorch.avgpool2d(t, (1, 2))
+    out = minitorch.avgpool2d(t, (1, 2))  # type: ignore
     assert_close(
         out[0, 0, 0, 0], sum([t[0, 0, i, j] for i in range(1) for j in range(2)]) / 2.0
     )
-    minitorch.grad_check(lambda t: minitorch.avgpool2d(t, (2, 2)), t)
+    minitorch.grad_check(lambda t: minitorch.avgpool2d(t, (2, 2)), t)  # type: ignore
 
 
 @pytest.mark.task4_4
 @given(tensors(shape=(2, 3, 4)))
 def test_max(t: Tensor) -> None:
     # TODO: Implement for Task 4.4.
-    raise NotImplementedError("Need to implement for Task 4.4")
+    # Test max along dim 0 (batch dimension)
+    out = minitorch.max(t, 0)  # type: ignore
+    assert_close(out.view(3, 4)[0, 0], max([t[i, 0, 0] for i in range(2)]))
+
+    # Test max along dim 1 (channel dimension)
+    out = minitorch.max(t, 1)  # type: ignore
+    assert_close(out.view(2, 4)[0, 0], max([t[0, i, 0] for i in range(3)]))
+
+    # Test max along dim 2 (width dimension)
+    out = minitorch.max(t, 2)  # type: ignore
+    assert_close(out.view(2, 3)[0, 0], max([t[0, 0, i] for i in range(4)]))
+
+    # Gradient check with random noise added to avoid ties
+    minitorch.grad_check(
+        lambda a: nn.max(a, dim=2),
+        t + minitorch.rand(t.shape),  # type: ignore
+    )
 
 
 @pytest.mark.task4_4
 @given(tensors(shape=(1, 1, 4, 4)))
 def test_max_pool(t: Tensor) -> None:
-    out = minitorch.maxpool2d(t, (2, 2))
+    out = minitorch.maxpool2d(t, (2, 2))  # type: ignore
     print(out)
     print(t)
     assert_close(
         out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(2) for j in range(2)])
     )
 
-    out = minitorch.maxpool2d(t, (2, 1))
+    out = minitorch.maxpool2d(t, (2, 1))  # type: ignore
     assert_close(
         out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(2) for j in range(1)])
     )
 
-    out = minitorch.maxpool2d(t, (1, 2))
+    out = minitorch.maxpool2d(t, (1, 2))  # type: ignore
     assert_close(
         out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(1) for j in range(2)])
     )
@@ -59,12 +76,12 @@ def test_max_pool(t: Tensor) -> None:
 @pytest.mark.task4_4
 @given(tensors())
 def test_drop(t: Tensor) -> None:
-    q = minitorch.dropout(t, 0.0)
+    q = minitorch.dropout(t, 0.0)  # type: ignore
     idx = q._tensor.sample()
     assert q[idx] == t[idx]
-    q = minitorch.dropout(t, 1.0)
+    q = minitorch.dropout(t, 1.0)  # type: ignore
     assert q[q._tensor.sample()] == 0.0
-    q = minitorch.dropout(t, 1.0, ignore=True)
+    q = minitorch.dropout(t, 1.0, ignore=True)  # type: ignore
     idx = q._tensor.sample()
     assert q[idx] == t[idx]
 
@@ -72,23 +89,23 @@ def test_drop(t: Tensor) -> None:
 @pytest.mark.task4_4
 @given(tensors(shape=(1, 1, 4, 4)))
 def test_softmax(t: Tensor) -> None:
-    q = minitorch.softmax(t, 3)
+    q = minitorch.softmax(t, 3)  # type: ignore
     x = q.sum(dim=3)
     assert_close(x[0, 0, 0, 0], 1.0)
 
-    q = minitorch.softmax(t, 1)
+    q = minitorch.softmax(t, 1)  # type: ignore
     x = q.sum(dim=1)
     assert_close(x[0, 0, 0, 0], 1.0)
 
-    minitorch.grad_check(lambda a: minitorch.softmax(a, dim=2), t)
+    minitorch.grad_check(lambda a: minitorch.softmax(a, dim=2), t)  # type: ignore
 
 
 @pytest.mark.task4_4
 @given(tensors(shape=(1, 1, 4, 4)))
 def test_log_softmax(t: Tensor) -> None:
-    q = minitorch.softmax(t, 3)
-    q2 = minitorch.logsoftmax(t, 3).exp()
+    q = minitorch.softmax(t, 3)  # type: ignore
+    q2 = minitorch.logsoftmax(t, 3).exp()  # type: ignore
     for i in q._tensor.indices():
         assert_close(q[i], q2[i])
 
-    minitorch.grad_check(lambda a: minitorch.logsoftmax(a, dim=2), t)
+    minitorch.grad_check(lambda a: minitorch.logsoftmax(a, dim=2), t)  # type: ignore
