@@ -42,37 +42,60 @@ class Conv2d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # print("input shape ", input.shape)
+        output = minitorch.conv2d(input, self.weights.value)
+        return output + self.bias.value
 
 
 class Network(minitorch.Module):
     """
-    Implement a CNN for MNist classification based on LeNet.
-
-    This model should implement the following procedure:
-
-    1. Apply a convolution with 4 output channels and a 3x3 kernel followed by a ReLU (save to self.mid)
-    2. Apply a convolution with 8 output channels and a 3x3 kernel followed by a ReLU (save to self.out)
-    3. Apply 2D pooling (either Avg or Max) with 4x4 kernel.
-    4. Flatten channels, height, and width. (Should be size BATCHx392)
-    5. Apply a Linear to size 64 followed by a ReLU and Dropout with rate 25%
-    6. Apply a Linear to size C (number of classes).
-    7. Apply a logsoftmax over the class dimension.
+    CNN implementation for MNIST classification inspired by LeNet architecture.
     """
-
     def __init__(self):
         super().__init__()
 
-        # For vis
+        # Visualization hooks
         self.mid = None
         self.out = None
 
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Convolutional layers
+        self.initial_conv = Conv2d(in_channels=1, out_channels=4, kh=3, kw=3)
+        self.deep_conv = Conv2d(in_channels=4, out_channels=8, kh=3, kw=3)
+
+        # Dense layers
+        self.hidden_layer = Linear(in_size=392, out_size=64)
+        self.output_layer = Linear(in_size=64, out_size=C)
+
+        # Dropout probability
+        self.drop_prob = 0.25
 
     def forward(self, x):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # First conv block
+        x = self.initial_conv.forward(x)
+        x = x.relu()
+        self.mid = x  # Save mid visualization here
+
+        # Second conv block
+        x = self.deep_conv.forward(x)
+        x = x.relu()
+        self.out = x  # Save out visualization here
+
+        # Pooling operation
+        x = minitorch.maxpool2d(x, (4, 4))
+
+        # Reshape for dense layers
+        x = x.view(x.shape[0], x.shape[1] * x.shape[2] * x.shape[3])
+
+        # Dense layers with activation and regularization
+        x = self.hidden_layer.forward(x)
+        x = x.relu()
+        x = minitorch.dropout(x, self.drop_prob, not self.training)
+
+        # Final classification layer
+        x = self.output_layer.forward(x)
+
+        # Apply log softmax for classification
+        return minitorch.logsoftmax(x, dim=1)
 
 
 def make_mnist(start, stop):

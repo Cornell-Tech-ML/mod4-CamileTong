@@ -61,45 +61,45 @@ class CNNSentimentKim(minitorch.Module):
     ):
         super().__init__()
         self.feature_map_size = feature_map_size
-        # TODO: Implement for Task 4.5.
-        # Create parallel convolution layers for different filter sizes
-        self.convs = []
-        for filter_size in filter_sizes:
-            self.convs.append(Conv1d(embedding_size, feature_map_size, filter_size))
 
-        # Linear layer for final classification
-        # Input size is feature_map_size * number of filter sizes
-        self.linear = Linear(feature_map_size * len(filter_sizes), 1)
+        # TODO: Implement for Task 4.5.
+        self.dropout = dropout
+        # Create parallel convolution layers for different filter sizes
+        self.convolutions = []
+        for i, filter_size in enumerate(filter_sizes):
+            conv = Conv1d(embedding_size, feature_map_size, filter_size)
+            setattr(self, f'conv_{i}', conv)
+            self.convolutions.append(conv)
+
+        self.linear = Linear(feature_map_size, 1)
 
 
     def forward(self, embeddings):
-        """
-        embeddings tensor: [batch x sentence length x embedding dim]
-        """
-        # TODO: Implement for Task 4.5.
-        # Transpose to [batch x embedding dim x sentence length] for Conv1d
-        x = embeddings.permute(0, 2, 1)
+        """embeddings tensor: [batch x sentence length x embedding dim]"""
+        # Rearrange dimensions for convolution
+        batch_input = embeddings.permute(0, 2, 1)
 
-        # Apply convolutions and collect results
-        conv_results = []
-        for conv in self.convs:
-            # Apply convolution and ReLU
-            activated = minitorch.relu(conv.forward(x))
-            # Max-over-time pooling
-            pooled = minitorch.max(activated, 2)
-            conv_results.append(pooled)
+        # Apply all convolutions in parallel and combine results
+        all_features = []
+        for conv_layer in self.convolutions:
+            # Apply convolution and activation
+            activated = conv_layer.forward(batch_input).relu()
+            # Global max pooling
+            pooled = minitorch.max(activated, dim=2)
+            all_features.append(pooled)
 
-        # Concatenate all conv results
-        combined = minitorch.cat(conv_results, 1)
+        # Combine all feature maps
+        combined = all_features[0]
+        for feature in all_features[1:]:
+            combined = combined + feature
 
-        # Apply dropout (during training)
+        # Apply dropout and classification layers
         if self.training:
-            combined = minitorch.dropout(combined, self.dropout)
+            combined = minitorch.dropout(combined, self.dropout, True)
 
-        # Final linear layer and sigmoid
-        logits = self.linear.forward(combined)
-        return minitorch.sigmoid(logits.view(logits.shape[0]))
-
+        # Final classification
+        batch_size = batch_input.shape[0]
+        return self.linear.forward(combined.view(batch_size, self.feature_map_size)).sigmoid().view(batch_size)
 
 # Evaluation helper methods
 def get_predictions_array(y_true, model_output):
@@ -284,7 +284,7 @@ def encode_sentiment_data(dataset, pretrained_embeddings, N_train, N_val=0):
 if __name__ == "__main__":
     train_size = 450
     validation_size = 100
-    learning_rate = 0.01
+    learning_rate = 0.12
     max_epochs = 250
 
     (X_train, y_train), (X_val, y_val) = encode_sentiment_data(
